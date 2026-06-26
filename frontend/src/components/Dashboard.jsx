@@ -11,11 +11,13 @@ import {
   TrendingUp,
   Plus,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Monitor,
+  Briefcase
 } from 'lucide-react';
 
 const Dashboard = ({ setActiveTab }) => {
-  const { employees, records, user, api, triggerNotification } = useContext(AttendanceContext);
+  const { employees, records, api, triggerNotification } = useContext(AttendanceContext);
 
   const trendsCanvasRef = useRef(null);
   const statsCanvasRef = useRef(null);
@@ -31,36 +33,29 @@ const Dashboard = ({ setActiveTab }) => {
     return new Date(dateStr).toLocaleDateString('en-US', options);
   };
 
-  const isAdmin = user && user.role === 'Admin';
-
+  const activeEmployees = employees.filter(emp => emp.status === 'Active');
+  
   // Filter records for today
   const todayRecords = records.filter(rec => rec.date === todayStr);
 
-  const totalEmployees = employees.length;
+  const totalEmployees = activeEmployees.length;
   const presentToday = todayRecords.filter(rec => rec.status === 'Present').length;
   const absentToday = todayRecords.filter(rec => rec.status === 'Absent').length;
   const leaveToday = todayRecords.filter(rec => rec.status === 'Leave').length;
+  const halfDayToday = todayRecords.filter(rec => rec.status === 'Half Day').length;
+  const wfhToday = todayRecords.filter(rec => rec.status === 'Work From Home').length;
   
   // Roster attendance status map
   const markedEmployeesMap = new Map(todayRecords.map(rec => [rec.employeeId, rec.status]));
-  const unmarkedEmployees = employees.filter(emp => !markedEmployeesMap.has(emp.id));
+  const unmarkedEmployees = activeEmployees.filter(emp => !markedEmployeesMap.has(emp.id));
 
-  // Overall statistics
-  const totalDaysTracked = records.length;
+
   const totalPresent = records.filter(rec => rec.status === 'Present').length;
   const totalAbsent = records.filter(rec => rec.status === 'Absent').length;
   const totalLeave = records.filter(rec => rec.status === 'Leave').length;
+  const totalHalfDay = records.filter(rec => rec.status === 'Half Day').length;
+  const totalWFH = records.filter(rec => rec.status === 'Work From Home').length;
 
-  const attendancePercentage = totalDaysTracked > 0 
-    ? Math.round((totalPresent / totalDaysTracked) * 100) 
-    : 0;
-
-  // SVG Progress Ring calculations
-  const radius = 60;
-  const stroke = 12;
-  const normalizedRadius = radius - stroke * 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
-  const strokeDashoffset = circumference - (attendancePercentage / 100) * circumference;
 
 
   // CSV and PDF Report Download Logic
@@ -95,7 +90,11 @@ const Dashboard = ({ setActiveTab }) => {
       const presenceRates = recentDates.map(date => {
         const dayRecords = records.filter(r => r.date === date);
         const presentCount = dayRecords.filter(r => r.status === 'Present').length;
-        return dayRecords.length > 0 ? Math.round((presentCount / dayRecords.length) * 100) : 0;
+        const wfhCount = dayRecords.filter(r => r.status === 'Work From Home').length;
+        const halfDayCount = dayRecords.filter(r => r.status === 'Half Day').length;
+        
+        const score = presentCount + wfhCount + (halfDayCount * 0.5);
+        return dayRecords.length > 0 ? Math.round((score / dayRecords.length) * 100) : 0;
       });
 
       // Destroy previous chart instance if exists
@@ -112,7 +111,7 @@ const Dashboard = ({ setActiveTab }) => {
             return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           }),
           datasets: [{
-            label: 'Presence Rate (%)',
+            label: 'Attendance Rate (%)',
             data: presenceRates,
             borderColor: '#4f46e5',
             backgroundColor: 'rgba(79, 70, 229, 0.1)',
@@ -155,10 +154,10 @@ const Dashboard = ({ setActiveTab }) => {
       statsChartInstance.current = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: ['Present', 'Absent', 'Leave'],
+          labels: ['Present', 'Absent', 'Leave', 'Half Day', 'WFH'],
           datasets: [{
-            data: [totalPresent, totalAbsent, totalLeave],
-            backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+            data: [totalPresent, totalAbsent, totalLeave, totalHalfDay, totalWFH],
+            backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6'],
             borderWidth: 2,
             borderColor: 'var(--surface)',
           }]
@@ -171,8 +170,8 @@ const Dashboard = ({ setActiveTab }) => {
               position: 'bottom',
               labels: {
                 color: 'var(--text-secondary)',
-                boxWidth: 12,
-                font: { size: 11, weight: 'bold' }
+                boxWidth: 10,
+                font: { size: 10, weight: 'bold' }
               }
             }
           },
@@ -185,7 +184,7 @@ const Dashboard = ({ setActiveTab }) => {
       if (trendsChartInstance.current) trendsChartInstance.current.destroy();
       if (statsChartInstance.current) statsChartInstance.current.destroy();
     };
-  }, [records, totalPresent, totalAbsent, totalLeave]);
+  }, [records, totalPresent, totalAbsent, totalLeave, totalHalfDay, totalWFH]);
 
   return (
     <div className="dashboard-layout">
@@ -200,7 +199,7 @@ const Dashboard = ({ setActiveTab }) => {
       }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            {isAdmin ? 'System Dashboard Overview' : 'My Attendance Dashboard'}
+            System Dashboard Overview
           </h2>
           <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
             <Calendar size={16} className="text-muted" />
@@ -209,62 +208,59 @@ const Dashboard = ({ setActiveTab }) => {
         </div>
         
         {/* Admin Reports Export Buttons */}
-        {isAdmin ? (
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button 
+            className="btn btn-secondary" 
+            style={{ width: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}
+            onClick={() => handleExport('csv')}
+          >
+            <FileSpreadsheet size={16} />
+            <span>Export CSV</span>
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            style={{ width: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}
+            onClick={() => handleExport('pdf')}
+          >
+            <FileText size={16} />
+            <span>Export PDF</span>
+          </button>
+          {unmarkedEmployees.length > 0 && (
             <button 
-              className="btn btn-secondary" 
+              className="btn btn-primary" 
               style={{ width: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}
-              onClick={() => handleExport('csv')}
+              onClick={() => setActiveTab('mark')}
             >
-              <FileSpreadsheet size={16} />
-              <span>Export CSV</span>
+              <Plus size={18} />
+              <span>Mark Attendance</span>
             </button>
-            <button 
-              className="btn btn-secondary" 
-              style={{ width: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}
-              onClick={() => handleExport('pdf')}
-            >
-              <FileText size={16} />
-              <span>Export PDF</span>
-            </button>
-            {unmarkedEmployees.length > 0 && (
-              <button 
-                className="btn btn-primary" 
-                style={{ width: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1rem' }}
-                onClick={() => setActiveTab('mark')}
-              >
-                <Plus size={18} />
-                <span>Mark Attendance</span>
-              </button>
-            )}
-          </div>
-        ) : null}
+          )}
+        </div>
       </div>
 
       {/* Stats Cards Grid */}
       <div className="dashboard-grid" style={{
         display: 'grid',
-        gridTemplateColumns: isAdmin ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '1.25rem',
         marginBottom: '1.5rem'
       }}>
-        {isAdmin && (
-          <div className="card stat-card">
-            <div className="stat-info">
-              <span className="stat-label">Total Roster</span>
-              <span className="stat-value">{totalEmployees}</span>
-            </div>
-            <div className="stat-icon-wrapper primary">
-              <Users size={24} />
-            </div>
+        {/* Total Roster Card */}
+        <div className="card stat-card">
+          <div className="stat-info">
+            <span className="stat-label">Total Roster</span>
+            <span className="stat-value">{totalEmployees}</span>
           </div>
-        )}
+          <div className="stat-icon-wrapper primary">
+            <Users size={24} />
+          </div>
+        </div>
 
         {/* Present Stats */}
         <div className="card stat-card">
           <div className="stat-info">
-            <span className="stat-label">{isAdmin ? 'Present Today' : 'Total Days Present'}</span>
-            <span className="stat-value">{isAdmin ? presentToday : totalPresent}</span>
+            <span className="stat-label">Present Today</span>
+            <span className="stat-value">{presentToday}</span>
           </div>
           <div className="stat-icon-wrapper success">
             <UserCheck size={24} />
@@ -274,8 +270,8 @@ const Dashboard = ({ setActiveTab }) => {
         {/* Absent Stats */}
         <div className="card stat-card">
           <div className="stat-info">
-            <span className="stat-label">{isAdmin ? 'Absent Today' : 'Total Days Absent'}</span>
-            <span className="stat-value">{isAdmin ? absentToday : totalAbsent}</span>
+            <span className="stat-label">Absent Today</span>
+            <span className="stat-value">{absentToday}</span>
           </div>
           <div className="stat-icon-wrapper danger">
             <UserX size={24} />
@@ -285,11 +281,33 @@ const Dashboard = ({ setActiveTab }) => {
         {/* Leave Stats */}
         <div className="card stat-card">
           <div className="stat-info">
-            <span className="stat-label">{isAdmin ? 'On Leave Today' : 'Total Days On Leave'}</span>
-            <span className="stat-value">{isAdmin ? leaveToday : totalLeave}</span>
+            <span className="stat-label">On Leave Today</span>
+            <span className="stat-value">{leaveToday}</span>
           </div>
           <div className="stat-icon-wrapper warning">
             <UserMinus size={24} />
+          </div>
+        </div>
+
+        {/* Half Day Stats */}
+        <div className="card stat-card">
+          <div className="stat-info">
+            <span className="stat-label">Half Day Today</span>
+            <span className="stat-value">{halfDayToday}</span>
+          </div>
+          <div className="stat-icon-wrapper" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+            <Briefcase size={24} />
+          </div>
+        </div>
+
+        {/* WFH Stats */}
+        <div className="card stat-card">
+          <div className="stat-info">
+            <span className="stat-label">WFH Today</span>
+            <span className="stat-value">{wfhToday}</span>
+          </div>
+          <div className="stat-icon-wrapper" style={{ backgroundColor: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
+            <Monitor size={24} />
           </div>
         </div>
       </div>
@@ -302,7 +320,6 @@ const Dashboard = ({ setActiveTab }) => {
         alignItems: 'stretch'
       }}>
         
-        {/* Left Side: Graphs & History */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {/* Chart JS Panel */}
@@ -313,11 +330,11 @@ const Dashboard = ({ setActiveTab }) => {
                 <span>Attendance Analytical Trends</span>
               </h3>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem', flexWrap: 'wrap' }} className="summary-container">
+              <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '1.5rem' }} className="summary-container">
                 {/* Trends Line Graph */}
                 <div>
                   <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                    {isAdmin ? 'Daily Presence Rate (Past 7 Active Days)' : 'My Historical Attendance Trend'}
+                    Daily Presence Rate (Past 7 Active Days)
                   </h4>
                   <div style={{ height: '220px', position: 'relative' }}>
                     <canvas ref={trendsCanvasRef}></canvas>
@@ -327,7 +344,7 @@ const Dashboard = ({ setActiveTab }) => {
                 {/* Doughnut Distribution */}
                 <div>
                   <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.75rem', textAlign: 'center' }}>
-                    {isAdmin ? 'Total System Distribution' : 'My Status Distribution'}
+                    Total System Distribution
                   </h4>
                   <div style={{ height: '220px', position: 'relative' }}>
                     <canvas ref={statsCanvasRef}></canvas>
@@ -343,113 +360,48 @@ const Dashboard = ({ setActiveTab }) => {
             </div>
           )}
 
-          {/* Today's Roster List (Admin Only) or Recent Logs (Employee Only) */}
+          {/* Today's Roster List */}
           <div className="card">
             <h3 className="card-title">
-              {isAdmin ? "Today's Attendance Status Registry" : 'My Recent Attendance Records'}
+              Today's Attendance Status Registry
             </h3>
             
-            {isAdmin ? (
-              todayRecords.length === 0 ? (
-                <div className="empty-state" style={{ padding: '1.5rem' }}>
-                  <p>No records marked for today yet.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {todayRecords.map((rec) => {
-                    const emp = employees.find(e => e.id === rec.employeeId);
-                    if (!emp) return null;
-                    return (
-                      <div key={rec.id} className="roster-item" style={{ padding: '0.65rem 1rem' }}>
-                        <div className="roster-item-info">
-                          <div className="roster-avatar">
-                            {emp.name.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontWeight: 600 }}>{emp.name}</span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{emp.department} • {emp.designation}</span>
-                          </div>
+            {todayRecords.length === 0 ? (
+              <div className="empty-state" style={{ padding: '1.5rem' }}>
+                <p>No records marked for today yet.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {todayRecords.map((rec) => {
+                  const emp = activeEmployees.find(e => e.id === rec.employeeId);
+                  if (!emp) return null;
+                  return (
+                    <div key={rec.id} className="roster-item" style={{ padding: '0.65rem 1rem' }}>
+                      <div className="roster-item-info">
+                        <div className="roster-avatar">
+                          {emp.name.split(' ').map(n => n[0]).join('')}
                         </div>
-                        <span className={`badge ${rec.status.toLowerCase()}`}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontWeight: 600 }}>{emp.name}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({emp.employeeId || 'N/A'})</span>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{emp.department} • {emp.designation}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {rec.time && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{rec.time}</span>}
+                        <span className={`badge ${rec.status.toLowerCase().replace(/\s+/g, '-')}`}>
                           {rec.status}
                         </span>
                       </div>
-                    );
-                  })}
-                </div>
-              )
-            ) : (
-              // Employee: View Own Records List
-              records.length === 0 ? (
-                <div className="empty-state" style={{ padding: '1.5rem' }}>
-                  <p>No attendance logs registered for your account yet.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', maxHeight: '250px', overflowY: 'auto' }}>
-                  {records.map((rec) => (
-                    <div key={rec.id} className="roster-item" style={{ padding: '0.65rem 1.25rem', borderBottom: '1px solid var(--bg-secondary)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Calendar size={15} style={{ color: 'var(--text-muted)' }} />
-                        <span style={{ fontWeight: 600 }}>
-                          {new Date(rec.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-                      <span className={`badge ${rec.status.toLowerCase()}`}>
-                        {rec.status}
-                      </span>
                     </div>
-                  ))}
-                </div>
-              )
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
-
-        {/* Right Side Panel: Quick Action Sidebar (Admin only) or Progress rating (Employee only) */}
-        {!isAdmin && (
-          // Employee Right Panel: Progress Circle Summary
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-            <h3 className="card-title" style={{ width: '100%', textAlign: 'center', marginBottom: '1.5rem' }}>My Attendance Score</h3>
-            
-            <div className="progress-ring-container" style={{ width: '150px', height: '150px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg height={radius * 2} width={radius * 2}>
-                <circle
-                  stroke="var(--bg-secondary)"
-                  fill="transparent"
-                  strokeWidth={stroke}
-                  r={normalizedRadius}
-                  cx={radius}
-                  cy={radius}
-                />
-                <circle
-                  stroke="var(--success)"
-                  fill="transparent"
-                  strokeWidth={stroke}
-                  strokeDasharray={circumference + ' ' + circumference}
-                  style={{ strokeDashoffset }}
-                  strokeLinecap="round"
-                  className="progress-ring-circle"
-                  r={normalizedRadius}
-                  cx={radius}
-                  cy={radius}
-                />
-              </svg>
-              <div className="progress-ring-text" style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span className="progress-ring-percent" style={{ fontSize: '1.5rem', fontWeight: 800 }}>{attendancePercentage}%</span>
-                <span className="progress-ring-label" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Presence Rate</span>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-              <h4 style={{ fontWeight: 700, fontSize: '1.1rem', color: attendancePercentage >= 75 ? 'var(--success)' : 'var(--danger)' }}>
-                {attendancePercentage >= 90 ? 'Excellent Rating!' : attendancePercentage >= 75 ? 'Good Rating!' : 'Needs Attention!'}
-              </h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', maxWidth: '250px' }}>
-                Keep logging your attendance regularly. A presence rate above 75% is standard.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

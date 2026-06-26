@@ -11,22 +11,22 @@ import {
   Moon, 
   Menu, 
   X,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
 
 const Navbar = ({ activeTab, setActiveTab }) => {
   const { theme, toggleTheme, user, logout } = useContext(AttendanceContext);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Filter navigation items based on user role
+  // Manager Workspace navigation items
   const navItems = [
-    { id: 'dashboard', label: user?.role === 'Employee' ? 'My Attendance' : 'Dashboard', icon: LayoutDashboard },
-    ...(user?.role === 'Admin' ? [
-      { id: 'mark', label: 'Mark Attendance', icon: UserCheck },
-      { id: 'history', label: 'Attendance History', icon: History },
-      { id: 'summary', label: 'Monthly Summary', icon: BarChart3 },
-      { id: 'roster', label: 'Employee Roster', icon: Users },
-    ] : [])
+    { id: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
+    { id: 'roster', label: 'Employee Management', icon: Users },
+    { id: 'mark', label: 'Attendance Panel', icon: UserCheck },
+    { id: 'history', label: 'Attendance History', icon: History },
+    { id: 'summary', label: 'Reports', icon: BarChart3 },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   const handleNavClick = (tabId) => {
@@ -49,7 +49,7 @@ const Navbar = ({ activeTab, setActiveTab }) => {
         {/* Brand/Logo */}
         <div className="nav-logo" onClick={() => handleNavClick('dashboard')}>
           <CalendarCheck size={28} strokeWidth={2.5} />
-          <span>TrackFlow</span>
+          <span>{import.meta.env.VITE_APP_TITLE || 'TrackFlow'}</span>
         </div>
 
         {/* Desktop Links (Hidden, handled by CSS) */}

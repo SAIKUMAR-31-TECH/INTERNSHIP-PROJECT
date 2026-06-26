@@ -1,42 +1,27 @@
 const Employee = require('../models/Employee');
 const Attendance = require('../models/Attendance');
 
-// @desc    Get all employees (Admin) or own profile (Employee)
+// @desc    Get all employees (Admin)
 // @route   GET /api/employees
 // @access  Protected
 const getEmployees = async (req, res, next) => {
   try {
-    if (req.user.role === 'Admin') {
-      const employees = await Employee.find({}).sort({ name: 1 });
-      const mapped = employees.map(emp => ({
-        id: emp._id.toString(),
-        name: emp.name,
-        email: emp.email,
-        department: emp.department,
-        designation: emp.designation,
-        mobile: emp.mobile,
-        createdAt: emp.createdAt,
-        updatedAt: emp.updatedAt
-      }));
-      return res.status(200).json({ success: true, count: mapped.length, data: mapped });
-    } else {
-      // Find employee that matches user email
-      const employee = await Employee.findOne({ email: req.user.email });
-      if (!employee) {
-        return res.status(404).json({ success: false, message: 'Employee profile not found for this user account' });
-      }
-      const mappedEmployee = {
-        id: employee._id.toString(),
-        name: employee.name,
-        email: employee.email,
-        department: employee.department,
-        designation: employee.designation,
-        mobile: employee.mobile,
-        createdAt: employee.createdAt,
-        updatedAt: employee.updatedAt
-      };
-      return res.status(200).json({ success: true, data: [mappedEmployee] }); // Return as array for compatibility
-    }
+    const employees = await Employee.find({}).sort({ name: 1 });
+    const mapped = employees.map(emp => ({
+      id: emp._id.toString(),
+      employeeId: emp.employeeId,
+      name: emp.name,
+      email: emp.email,
+      department: emp.department,
+      designation: emp.designation,
+      phone: emp.phone,
+      mobile: emp.phone, // alias for frontend compatibility
+      joiningDate: emp.joiningDate,
+      status: emp.status,
+      createdAt: emp.createdAt,
+      updatedAt: emp.updatedAt
+    }));
+    return res.status(200).json({ success: true, count: mapped.length, data: mapped });
   } catch (error) {
     next(error);
   }
@@ -47,11 +32,18 @@ const getEmployees = async (req, res, next) => {
 // @access  Protected (Admin only)
 const createEmployee = async (req, res, next) => {
   try {
-    const { name, email, department, designation, mobile } = req.body;
+    const { employeeId, name, email, department, designation, phone, mobile, joiningDate, status } = req.body;
 
-    if (!name || !email) {
+    if (!employeeId || !name || !email) {
       res.status(400);
-      throw new Error('Please enter name and email');
+      throw new Error('Please enter employeeId, name, and email');
+    }
+
+    // Check duplicate employeeId
+    const employeeIdExists = await Employee.findOne({ employeeId });
+    if (employeeIdExists) {
+      res.status(400);
+      throw new Error(`An employee with ID ${employeeId} already exists`);
     }
 
     // Check duplicate email
@@ -62,20 +54,27 @@ const createEmployee = async (req, res, next) => {
     }
 
     const employee = await Employee.create({
+      employeeId,
       name,
       email,
       department: department || 'General',
       designation: designation || 'Associate',
-      mobile: mobile || '',
+      phone: phone || mobile || '',
+      joiningDate: joiningDate || Date.now(),
+      status: status || 'Active',
     });
 
     const mapped = {
       id: employee._id.toString(),
+      employeeId: employee.employeeId,
       name: employee.name,
       email: employee.email,
       department: employee.department,
       designation: employee.designation,
-      mobile: employee.mobile,
+      phone: employee.phone,
+      mobile: employee.phone, // alias
+      joiningDate: employee.joiningDate,
+      status: employee.status,
       createdAt: employee.createdAt,
       updatedAt: employee.updatedAt
     };
@@ -91,13 +90,22 @@ const createEmployee = async (req, res, next) => {
 // @access  Protected (Admin only)
 const updateEmployee = async (req, res, next) => {
   try {
-    const { name, email, department, designation, mobile } = req.body;
+    const { employeeId, name, email, department, designation, phone, mobile, joiningDate, status } = req.body;
 
     let employee = await Employee.findById(req.params.id);
 
     if (!employee) {
       res.status(404);
       throw new Error('Employee not found');
+    }
+
+    // If changing employeeId, verify it's not already in use
+    if (employeeId && employeeId !== employee.employeeId) {
+      const exists = await Employee.findOne({ employeeId });
+      if (exists) {
+        res.status(400);
+        throw new Error('Employee ID is already in use');
+      }
     }
 
     // If changing email, verify it's not already in use
@@ -111,17 +119,30 @@ const updateEmployee = async (req, res, next) => {
 
     employee = await Employee.findByIdAndUpdate(
       req.params.id,
-      { name, email, department, designation, mobile },
+      {
+        employeeId,
+        name,
+        email,
+        department,
+        designation,
+        phone: phone || mobile || '',
+        joiningDate,
+        status
+      },
       { new: true, runValidators: true }
     );
 
     const mapped = {
       id: employee._id.toString(),
+      employeeId: employee.employeeId,
       name: employee.name,
       email: employee.email,
       department: employee.department,
       designation: employee.designation,
-      mobile: employee.mobile,
+      phone: employee.phone,
+      mobile: employee.phone, // alias
+      joiningDate: employee.joiningDate,
+      status: employee.status,
       createdAt: employee.createdAt,
       updatedAt: employee.updatedAt
     };

@@ -1,33 +1,22 @@
 const Attendance = require('../models/Attendance');
 const Employee = require('../models/Employee');
 
-// @desc    Get all attendance records (Admin) or own records (Employee)
+// @desc    Get all attendance records (Admin only)
 // @route   GET /api/attendance
 // @access  Protected
 const getAttendance = async (req, res, next) => {
   try {
-    let records = [];
+    const records = await Attendance.find({}).sort({ date: -1, createdAt: -1 });
 
-    if (req.user.role === 'Admin') {
-      records = await Attendance.find({}).sort({ date: -1, createdAt: -1 });
-    } else {
-      // Find employee that matches user email
-      const employee = await Employee.findOne({ email: req.user.email });
-      if (!employee) {
-        return res.status(200).json({ success: true, count: 0, data: [] });
-      }
-      
-      records = await Attendance.find({ employeeId: employee._id }).sort({ date: -1 });
-    }
-
-    // Map _id to id for frontend compatibility
     const mappedRecords = records.map((rec) => {
-      const obj = rec.toObject();
       return {
         id: rec._id.toString(),
         employeeId: rec.employeeId.toString(),
+        employeeName: rec.employeeName,
         date: rec.date,
+        time: rec.time,
         status: rec.status,
+        managerId: rec.managerId ? rec.managerId.toString() : null,
         createdAt: rec.createdAt,
       };
     });
@@ -50,15 +39,6 @@ const createAttendance = async (req, res, next) => {
       throw new Error('Please enter employeeId, date, and status');
     }
 
-    // Role-based verification: Employees can only mark their own attendance
-    if (req.user.role === 'Employee') {
-      const employee = await Employee.findOne({ email: req.user.email });
-      if (!employee || employee._id.toString() !== employeeId) {
-        res.status(403);
-        throw new Error('Access denied: You can only record attendance for yourself');
-      }
-    }
-
     // Check duplicate record for same date and employee
     const duplicate = await Attendance.findOne({ employeeId, date });
     if (duplicate) {
@@ -66,21 +46,101 @@ const createAttendance = async (req, res, next) => {
       throw new Error('Attendance has already been marked for this employee on this date');
     }
 
+    const employee = await Employee.findById(employeeId);
+    if (!employee) {
+      res.status(404);
+      throw new Error('Employee not found');
+    }
+
+    const time = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
     const record = await Attendance.create({
       employeeId,
+      employeeName: employee.name,
       date,
+      time,
       status,
+      managerId: req.user._id,
     });
 
     const mappedRecord = {
       id: record._id.toString(),
       employeeId: record.employeeId.toString(),
+      employeeName: record.employeeName,
       date: record.date,
+      time: record.time,
       status: record.status,
+      managerId: record.managerId ? record.managerId.toString() : null,
       createdAt: record.createdAt,
     };
 
     res.status(201).json({ success: true, data: mappedRecord });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Save bulk attendance records
+// @route   POST /api/attendance/bulk
+// @access  Protected (Admin/Manager only)
+const saveBulkAttendance = async (req, res, next) => {
+  try {
+    const { date, records } = req.body;
+
+    if (!date || !records || !Array.isArray(records)) {
+      res.status(400);
+      throw new Error('Please enter date and records array');
+    }
+
+    const time = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    const managerId = req.user._id;
+    const processedRecords = [];
+
+    for (const rec of records) {
+      const { employeeId, status } = rec;
+
+      if (!employeeId || !status) continue;
+
+      const employee = await Employee.findById(employeeId);
+      if (!employee) continue;
+
+      // Find if record already exists for date + employee
+      const existing = await Attendance.findOne({ employeeId, date });
+
+      if (existing) {
+        existing.status = status;
+        existing.time = time;
+        existing.managerId = managerId;
+        existing.employeeName = employee.name;
+        await existing.save();
+        processedRecords.push(existing);
+      } else {
+        const newRecord = await Attendance.create({
+          employeeId,
+          employeeName: employee.name,
+          date,
+          time,
+          status,
+          managerId,
+        });
+        processedRecords.push(newRecord);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      count: processedRecords.length,
+      data: processedRecords,
+    });
   } catch (error) {
     next(error);
   }
@@ -99,12 +159,6 @@ const updateAttendance = async (req, res, next) => {
       throw new Error('Attendance record not found');
     }
 
-    // Role check: Only admin can edit or change past records, or employee if allowed (Admin only is requested: "Admin: Manage Attendance", "Employee: View Own Attendance")
-    if (req.user.role !== 'Admin') {
-      res.status(403);
-      throw new Error('Access denied: Only Admins can edit attendance records');
-    }
-
     // Check duplicate (but exclude this record itself)
     const duplicate = await Attendance.findOne({
       employeeId,
@@ -116,17 +170,39 @@ const updateAttendance = async (req, res, next) => {
       throw new Error('Attendance has already been marked for this employee on this date');
     }
 
+    const employee = await Employee.findById(employeeId);
+    if (!employee) {
+      res.status(404);
+      throw new Error('Employee not found');
+    }
+
+    const time = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
     record = await Attendance.findByIdAndUpdate(
       req.params.id,
-      { employeeId, date, status },
+      {
+        employeeId,
+        employeeName: employee.name,
+        date,
+        time,
+        status,
+        managerId: req.user._id,
+      },
       { new: true, runValidators: true }
     );
 
     const mappedRecord = {
       id: record._id.toString(),
       employeeId: record.employeeId.toString(),
+      employeeName: record.employeeName,
       date: record.date,
+      time: record.time,
       status: record.status,
+      managerId: record.managerId ? record.managerId.toString() : null,
       createdAt: record.createdAt,
     };
 
@@ -141,11 +217,6 @@ const updateAttendance = async (req, res, next) => {
 // @access  Protected (Admin only)
 const deleteAttendance = async (req, res, next) => {
   try {
-    if (req.user.role !== 'Admin') {
-      res.status(403);
-      throw new Error('Access denied: Only Admins can delete attendance records');
-    }
-
     const record = await Attendance.findById(req.params.id);
     if (!record) {
       res.status(404);
@@ -163,6 +234,7 @@ const deleteAttendance = async (req, res, next) => {
 module.exports = {
   getAttendance,
   createAttendance,
+  saveBulkAttendance,
   updateAttendance,
   deleteAttendance,
 };

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { AttendanceContext } from './AttendanceContext.js';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Create a custom axios instance
 const api = axios.create({
@@ -210,20 +210,23 @@ export const AttendanceProvider = ({ children }) => {
 
 
   // Roster Management (CRUD)
-  const addEmployee = async (name, email, department, designation, mobile) => {
-    if (!name.trim() || !email.trim()) {
-      triggerNotification('error', 'Name and Email are required.');
+  const addEmployee = async (employeeId, name, email, department, designation, phone, joiningDate, status) => {
+    if (!employeeId.trim() || !name.trim() || !email.trim()) {
+      triggerNotification('error', 'Employee ID, Name and Email are required.');
       return false;
     }
     
     try {
       setLoading(true);
       const res = await api.post('/employees', {
+        employeeId: employeeId.trim(),
         name: name.trim(),
         email: email.trim(),
         department: department?.trim() || 'General',
         designation: designation?.trim() || 'Associate',
-        mobile: mobile?.trim() || '',
+        phone: phone?.trim() || '',
+        joiningDate,
+        status: status || 'Active',
       });
 
       if (res.data && res.data.success) {
@@ -263,20 +266,23 @@ export const AttendanceProvider = ({ children }) => {
     }
   };
 
-  const updateEmployee = async (id, name, email, department, designation, mobile) => {
-    if (!name.trim() || !email.trim()) {
-      triggerNotification('error', 'Name and Email are required.');
+  const updateEmployee = async (id, employeeId, name, email, department, designation, phone, joiningDate, status) => {
+    if (!employeeId.trim() || !name.trim() || !email.trim()) {
+      triggerNotification('error', 'Employee ID, Name and Email are required.');
       return false;
     }
 
     try {
       setLoading(true);
       const res = await api.put(`/employees/${id}`, {
+        employeeId: employeeId.trim(),
         name: name.trim(),
         email: email.trim(),
         department: department?.trim() || 'General',
         designation: designation?.trim() || 'Associate',
-        mobile: mobile?.trim() || '',
+        phone: phone?.trim() || '',
+        joiningDate,
+        status: status || 'Active',
       });
 
       if (res.data && res.data.success) {
@@ -372,6 +378,25 @@ export const AttendanceProvider = ({ children }) => {
     }
   };
 
+  const saveBulkAttendance = async (date, recordsList) => {
+    try {
+      setLoading(true);
+      const res = await api.post('/attendance/bulk', { date, records: recordsList });
+      if (res.data && res.data.success) {
+        await fetchAttendance();
+        triggerNotification('success', 'Attendance saved successfully.');
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Bulk save attendance error:', err);
+      triggerNotification('error', err.response?.data?.message || 'Failed to save attendance');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AttendanceContext.Provider
       value={{
@@ -391,6 +416,7 @@ export const AttendanceProvider = ({ children }) => {
         addRecord,
         updateRecord,
         deleteRecord,
+        saveBulkAttendance,
         notification,
         triggerNotification,
         api, // Export axios instance for CSV/PDF report downloading

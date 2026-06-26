@@ -1,19 +1,23 @@
 import { useState, useContext } from 'react';
 import { AttendanceContext } from '../context/AttendanceContext';
-import { Users, UserPlus, Trash2, ShieldAlert, Mail, Briefcase, Award, Phone, Eye, Pencil, X, Filter } from 'lucide-react';
+import { Users, UserPlus, Trash2, ShieldAlert, Mail, Briefcase, Award, Phone, Eye, Pencil, X, Filter, Search, Calendar, ShieldCheck } from 'lucide-react';
 
 const EmployeeManager = () => {
   const { employees, addEmployee, updateEmployee, deleteEmployee, triggerNotification } = useContext(AttendanceContext);
   
-  // Filter state
+  // Search & Filter state
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('All');
   
-  // Form states
-  const [newEmployeeName, setNewEmployeeName] = useState('');
-  const [newEmployeeEmail, setNewEmployeeEmail] = useState('');
+  // Form states (Add New Employee)
+  const [employeeId, setEmployeeId] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('Engineering');
   const [designation, setDesignation] = useState('Software Engineer');
-  const [mobile, setMobile] = useState('');
+  const [phone, setPhone] = useState('');
+  const [joiningDate, setJoiningDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [status, setStatus] = useState('Active');
 
   // View & Edit Modal States
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -21,40 +25,64 @@ const EmployeeManager = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   // Edit Form States
+  const [editEmployeeId, setEditEmployeeId] = useState('');
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editDepartment, setEditDepartment] = useState('Engineering');
   const [editDesignation, setEditDesignation] = useState('Software Engineer');
-  const [editMobile, setEditMobile] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editJoiningDate, setEditJoiningDate] = useState('');
+  const [editStatus, setEditStatus] = useState('Active');
 
   const filteredEmployees = employees.filter((emp) => {
-    if (filterDepartment === 'All') return true;
-    return emp.department === filterDepartment;
+    const matchesDept = filterDepartment === 'All' || emp.department === filterDepartment;
+    
+    const term = searchQuery.toLowerCase();
+    const matchesSearch = 
+      emp.name.toLowerCase().includes(term) ||
+      emp.email.toLowerCase().includes(term) ||
+      (emp.employeeId && emp.employeeId.toLowerCase().includes(term)) ||
+      (emp.designation && emp.designation.toLowerCase().includes(term));
+
+    return matchesDept && matchesSearch;
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!newEmployeeName.trim() || !newEmployeeEmail.trim()) return;
+    if (!employeeId.trim() || !name.trim() || !email.trim()) return;
 
-    if (mobile.trim() && mobile.trim().length !== 10) {
-      triggerNotification('error', 'Mobile number must be exactly 10 digits.');
+    if (phone.trim() && phone.trim().length !== 10) {
+      triggerNotification('error', 'Phone number must be exactly 10 digits.');
+      return;
+    }
+
+    // Check duplicate employee ID in local state
+    const duplicateId = employees.some(emp => emp.employeeId === employeeId.trim());
+    if (duplicateId) {
+      triggerNotification('error', `Employee ID "${employeeId}" already exists.`);
       return;
     }
 
     const success = await addEmployee(
-      newEmployeeName.trim(),
-      newEmployeeEmail.trim(),
+      employeeId.trim(),
+      name.trim(),
+      email.trim(),
       department.trim(),
       designation.trim(),
-      mobile.trim()
+      phone.trim(),
+      joiningDate,
+      status
     );
     
     if (success) {
-      setNewEmployeeName('');
-      setNewEmployeeEmail('');
+      setEmployeeId('');
+      setName('');
+      setEmail('');
       setDepartment('Engineering');
       setDesignation('Software Engineer');
-      setMobile('');
+      setPhone('');
+      setJoiningDate(new Date().toISOString().split('T')[0]);
+      setStatus('Active');
     }
   };
 
@@ -65,30 +93,45 @@ const EmployeeManager = () => {
 
   const handleOpenEdit = (emp) => {
     setSelectedEmployee(emp);
+    setEditEmployeeId(emp.employeeId || '');
     setEditName(emp.name);
     setEditEmail(emp.email);
     setEditDepartment(emp.department);
     setEditDesignation(emp.designation);
-    setEditMobile(emp.mobile || '');
+    setEditPhone(emp.phone || emp.mobile || '');
+    setEditJoiningDate(emp.joiningDate ? emp.joiningDate.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setEditStatus(emp.status || 'Active');
     setIsEditOpen(true);
   };
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
-    if (!editName.trim() || !editEmail.trim()) return;
+    if (!editEmployeeId.trim() || !editName.trim() || !editEmail.trim()) return;
 
-    if (editMobile.trim() && editMobile.trim().length !== 10) {
-      triggerNotification('error', 'Mobile number must be exactly 10 digits.');
+    if (editPhone.trim() && editPhone.trim().length !== 10) {
+      triggerNotification('error', 'Phone number must be exactly 10 digits.');
+      return;
+    }
+
+    // Check duplicate employee ID in local state
+    const duplicateId = employees.some(
+      emp => emp.employeeId === editEmployeeId.trim() && emp.id !== selectedEmployee.id
+    );
+    if (duplicateId) {
+      triggerNotification('error', `Employee ID "${editEmployeeId}" already exists.`);
       return;
     }
 
     const success = await updateEmployee(
       selectedEmployee.id,
+      editEmployeeId.trim(),
       editName.trim(),
       editEmail.trim(),
       editDepartment.trim(),
       editDesignation.trim(),
-      editMobile.trim()
+      editPhone.trim(),
+      editJoiningDate,
+      editStatus
     );
 
     if (success) {
@@ -117,14 +160,31 @@ const EmployeeManager = () => {
       <div className="card" style={{ height: 'fit-content' }}>
         <h3 className="card-title">
           <UserPlus size={20} style={{ color: 'var(--primary)' }} />
-          Add New Employee
+          Enroll New Employee
         </h3>
         <p style={{ fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-          Enroll a new employee in the attendance register and user system.
+          Add an employee to the organizational roster.
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
+          {/* Employee ID */}
+          <div className="form-group">
+            <label htmlFor="new-emp-id" className="form-label">
+              Employee ID
+            </label>
+            <input
+              type="text"
+              id="new-emp-id"
+              placeholder="e.g. EMP001"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              className="form-input"
+              maxLength={20}
+              required
+            />
+          </div>
+
           {/* Full Name */}
           <div className="form-group">
             <label htmlFor="new-emp-name" className="form-label">
@@ -134,8 +194,8 @@ const EmployeeManager = () => {
               type="text"
               id="new-emp-name"
               placeholder="e.g. Rahul Sharma"
-              value={newEmployeeName}
-              onChange={(e) => setNewEmployeeName(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="form-input"
               maxLength={40}
               required
@@ -159,8 +219,8 @@ const EmployeeManager = () => {
                 type="email"
                 id="new-emp-email"
                 placeholder="e.g. rahul@example.com"
-                value={newEmployeeEmail}
-                onChange={(e) => setNewEmployeeEmail(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="form-input"
                 style={{ paddingLeft: '2.25rem' }}
                 required
@@ -231,10 +291,10 @@ const EmployeeManager = () => {
             </div>
           </div>
 
-          {/* Mobile Number */}
+          {/* Phone Number */}
           <div className="form-group">
-            <label htmlFor="new-emp-mobile" className="form-label">
-              Mobile Number
+            <label htmlFor="new-emp-phone" className="form-label">
+              Phone Number
             </label>
             <div style={{ position: 'relative' }}>
               <Phone size={14} style={{
@@ -246,10 +306,10 @@ const EmployeeManager = () => {
               }} />
               <input
                 type="tel"
-                id="new-emp-mobile"
+                id="new-emp-phone"
                 placeholder="e.g. 9876543210"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 className="form-input"
                 style={{ paddingLeft: '2.25rem' }}
                 maxLength={10}
@@ -257,11 +317,62 @@ const EmployeeManager = () => {
             </div>
           </div>
 
+          {/* Joining Date */}
+          <div className="form-group">
+            <label htmlFor="new-emp-joining" className="form-label">
+              Joining Date
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Calendar size={14} style={{
+                position: 'absolute',
+                left: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted)'
+              }} />
+              <input
+                type="date"
+                id="new-emp-joining"
+                value={joiningDate}
+                onChange={(e) => setJoiningDate(e.target.value)}
+                className="form-input"
+                style={{ paddingLeft: '2.25rem' }}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Status */}
+          <div className="form-group">
+            <label htmlFor="new-emp-status" className="form-label">
+              Status
+            </label>
+            <div style={{ position: 'relative' }}>
+              <ShieldCheck size={14} style={{
+                position: 'absolute',
+                left: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-muted)'
+              }} />
+              <select
+                id="new-emp-status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="form-select"
+                style={{ paddingLeft: '2.25rem' }}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
           <button
             type="submit"
             className="btn btn-primary"
             style={{ marginTop: '0.5rem' }}
-            disabled={!newEmployeeName.trim() || !newEmployeeEmail.trim()}
+            disabled={!employeeId.trim() || !name.trim() || !email.trim()}
           >
             Add Employee
           </button>
@@ -286,9 +397,7 @@ const EmployeeManager = () => {
             borderRadius: '50px',
             fontWeight: 700
           }}>
-            {filterDepartment === 'All' 
-              ? `${employees.length} Active` 
-              : `${filteredEmployees.length} of ${employees.length} Active`}
+            {filteredEmployees.length} of {employees.length}
           </span>
         </h3>
         <p style={{ fontSize: '0.875rem', marginBottom: '1.25rem' }}>
@@ -296,58 +405,65 @@ const EmployeeManager = () => {
         </p>
 
         {employees.length > 0 && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            marginBottom: '1.25rem',
-            padding: '0.5rem 0.75rem',
-            backgroundColor: 'var(--bg-secondary)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-color)',
-            transition: 'border-color var(--transition-fast)'
-          }}>
-            <Filter size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <span style={{
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              color: 'var(--text-secondary)',
-              whiteSpace: 'nowrap'
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            {/* Search Bar */}
+            <div className="search-wrapper" style={{ width: '100%' }}>
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search by name, ID, or designation..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="form-input search-input"
+              />
+            </div>
+
+            {/* Department Filter */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: 'var(--bg-secondary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-color)'
             }}>
-              Filter by Dept:
-            </span>
-            <select
-              id="dept-filter"
-              value={filterDepartment}
-              onChange={(e) => setFilterDepartment(e.target.value)}
-              style={{
-                margin: 0,
-                padding: '0.35rem 0.5rem',
-                fontSize: '0.85rem',
-                border: 'none',
-                backgroundColor: 'transparent',
-                color: 'var(--text-primary)',
-                fontFamily: 'var(--font-sans)',
-                cursor: 'pointer',
-                flexGrow: 1,
-                outline: 'none',
-                fontWeight: 500,
-              }}
-            >
-              <option value="All">All Departments</option>
-              <option value="Engineering">Engineering</option>
-              <option value="UI/UX Design">UI/UX Design</option>
-              <option value="Quality Assurance (QA)">Quality Assurance (QA)</option>
-              <option value="Human Resources (HR)">Human Resources (HR)</option>
-              <option value="Sales">Sales</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Finance">Finance</option>
-              <option value="Operations">Operations</option>
-              <option value="Information Technology (IT)">Information Technology (IT)</option>
-              <option value="Customer Support">Customer Support</option>
-              <option value="Business Development">Business Development</option>
-              <option value="Management">Management</option>
-            </select>
+              <Filter size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Filter Dept:
+              </span>
+              <select
+                id="dept-filter"
+                value={filterDepartment}
+                onChange={(e) => setFilterDepartment(e.target.value)}
+                style={{
+                  margin: 0,
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.85rem',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  flexGrow: 1,
+                  outline: 'none',
+                  fontWeight: 500,
+                }}
+              >
+                <option value="All">All Departments</option>
+                <option value="Engineering">Engineering</option>
+                <option value="UI/UX Design">UI/UX Design</option>
+                <option value="Quality Assurance (QA)">Quality Assurance (QA)</option>
+                <option value="Human Resources (HR)">Human Resources (HR)</option>
+                <option value="Sales">Sales</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Finance">Finance</option>
+                <option value="Operations">Operations</option>
+                <option value="Information Technology (IT)">Information Technology (IT)</option>
+                <option value="Customer Support">Customer Support</option>
+                <option value="Business Development">Business Development</option>
+                <option value="Management">Management</option>
+              </select>
+            </div>
           </div>
         )}
 
@@ -361,7 +477,7 @@ const EmployeeManager = () => {
           <div className="empty-state" style={{ flexGrow: 1, padding: '2rem 1rem' }}>
             <Users size={40} className="empty-state-icon" style={{ opacity: 0.5 }} />
             <h4 className="empty-state-title">No Employees Found</h4>
-            <p>There are no employees registered in the "{filterDepartment}" department.</p>
+            <p>There are no employees registered matching your search filter.</p>
           </div>
         ) : (
           <div className="roster-list" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', maxHeight: '560px' }}>
@@ -372,13 +488,21 @@ const EmployeeManager = () => {
                     {getInitials(emp.name)}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ fontWeight: 650, fontSize: '0.95rem' }}>{emp.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 650, fontSize: '0.95rem' }}>{emp.name}</span>
+                      <span className="badge" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: '0.65rem', fontWeight: 700 }}>
+                        {emp.employeeId || 'N/A'}
+                      </span>
+                      <span className={`badge ${emp.status === 'Active' ? 'present' : 'absent'}`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem' }}>
+                        {emp.status || 'Active'}
+                      </span>
+                    </div>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                       <span style={{ fontWeight: 500 }}>Email:</span> {emp.email}
                     </span>
-                    {emp.mobile && (
+                    {(emp.phone || emp.mobile) && (
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.1rem' }}>
-                        <span style={{ fontWeight: 500 }}>Mobile:</span> {emp.mobile}
+                        <span style={{ fontWeight: 500 }}>Phone:</span> {emp.phone || emp.mobile}
                       </span>
                     )}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.15rem' }}>
@@ -469,6 +593,10 @@ const EmployeeManager = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Employee ID:</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>{selectedEmployee.employeeId || 'N/A'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Email:</span>
                   <span style={{ color: 'var(--text-primary)' }}>{selectedEmployee.email}</span>
                 </div>
@@ -481,13 +609,19 @@ const EmployeeManager = () => {
                   <span style={{ color: 'var(--text-primary)' }}>{selectedEmployee.designation}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Mobile Number:</span>
-                  <span style={{ color: 'var(--text-primary)' }}>{selectedEmployee.mobile || 'N/A'}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Phone Number:</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{selectedEmployee.phone || selectedEmployee.mobile || 'N/A'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Enrolled Date:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Joining Date:</span>
                   <span style={{ color: 'var(--text-primary)' }}>
-                    {selectedEmployee.createdAt ? new Date(selectedEmployee.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+                    {selectedEmployee.joiningDate ? new Date(selectedEmployee.joiningDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Status:</span>
+                  <span className={`badge ${selectedEmployee.status === 'Active' ? 'present' : 'absent'}`}>
+                    {selectedEmployee.status || 'Active'}
                   </span>
                 </div>
               </div>
@@ -515,6 +649,22 @@ const EmployeeManager = () => {
             </div>
 
             <form onSubmit={handleEditSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              {/* Employee ID */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="edit-emp-id" className="form-label">Employee ID</label>
+                <input
+                  type="text"
+                  id="edit-emp-id"
+                  placeholder="e.g. EMP001"
+                  value={editEmployeeId}
+                  onChange={(e) => setEditEmployeeId(e.target.value)}
+                  className="form-input"
+                  maxLength={20}
+                  required
+                />
+              </div>
+
               {/* Full Name */}
               <div className="form-group" style={{ margin: 0 }}>
                 <label htmlFor="edit-emp-name" className="form-label">Full Name</label>
@@ -613,9 +763,9 @@ const EmployeeManager = () => {
                 </div>
               </div>
 
-              {/* Mobile Number */}
+              {/* Phone Number */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label htmlFor="edit-emp-mobile" className="form-label">Mobile Number</label>
+                <label htmlFor="edit-emp-phone" className="form-label">Phone Number</label>
                 <div style={{ position: 'relative' }}>
                   <Phone size={14} style={{
                     position: 'absolute',
@@ -626,14 +776,61 @@ const EmployeeManager = () => {
                   }} />
                   <input
                     type="tel"
-                    id="edit-emp-mobile"
+                    id="edit-emp-phone"
                     placeholder="e.g. 9876543210"
-                    value={editMobile}
-                    onChange={(e) => setEditMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     className="form-input"
                     style={{ paddingLeft: '2.25rem' }}
                     maxLength={10}
                   />
+                </div>
+              </div>
+
+              {/* Joining Date */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="edit-emp-joining" className="form-label">Joining Date</label>
+                <div style={{ position: 'relative' }}>
+                  <Calendar size={14} style={{
+                    position: 'absolute',
+                    left: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)'
+                  }} />
+                  <input
+                    type="date"
+                    id="edit-emp-joining"
+                    value={editJoiningDate}
+                    onChange={(e) => setEditJoiningDate(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '2.25rem' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label htmlFor="edit-emp-status" className="form-label">Status</label>
+                <div style={{ position: 'relative' }}>
+                  <ShieldCheck size={14} style={{
+                    position: 'absolute',
+                    left: '1rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)'
+                  }} />
+                  <select
+                    id="edit-emp-status"
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className="form-select"
+                    style={{ paddingLeft: '2.25rem' }}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
                 </div>
               </div>
 

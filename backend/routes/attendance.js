@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getAttendance,
   createAttendance,
+  saveBulkAttendance,
   updateAttendance,
   deleteAttendance,
 } = require('../controllers/attendanceController');
@@ -12,6 +13,8 @@ router
   .route('/')
   .get(protect, getAttendance)
   .post(protect, createAttendance);
+
+router.post('/bulk', protect, adminOnly, saveBulkAttendance);
 
 router
   .route('/:id')

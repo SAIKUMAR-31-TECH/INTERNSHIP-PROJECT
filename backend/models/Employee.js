@@ -2,6 +2,12 @@ const mongoose = require('mongoose');
 
 const employeeSchema = new mongoose.Schema(
   {
+    employeeId: {
+      type: String,
+      required: [true, 'Please add an employee ID'],
+      unique: true,
+      trim: true,
+    },
     name: {
       type: String,
       required: [true, 'Please add a name'],
@@ -17,6 +23,17 @@ const employeeSchema = new mongoose.Schema(
         'Please add a valid email',
       ],
     },
+    phone: {
+      type: String,
+      required: false,
+      trim: true,
+      validate: {
+        validator: function(v) {
+          return !v || /^\d{10}$/.test(v);
+        },
+        message: 'Phone number must be exactly 10 digits',
+      },
+    },
     department: {
       type: String,
       required: [true, 'Please add a department'],
@@ -29,16 +46,14 @@ const employeeSchema = new mongoose.Schema(
       trim: true,
       default: 'Associate',
     },
-    mobile: {
+    joiningDate: {
+      type: Date,
+      default: Date.now,
+    },
+    status: {
       type: String,
-      required: false,
-      trim: true,
-      validate: {
-        validator: function(v) {
-          return !v || /^\d{10}$/.test(v);
-        },
-        message: 'Mobile number must be exactly 10 digits',
-      },
+      enum: ['Active', 'Inactive'],
+      default: 'Active',
     },
   },
   {

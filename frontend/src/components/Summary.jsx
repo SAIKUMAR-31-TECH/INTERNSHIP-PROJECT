@@ -19,9 +19,14 @@ const Summary = () => {
   const presentDays = employeeRecords.filter(rec => rec.status === 'Present').length;
   const absentDays = employeeRecords.filter(rec => rec.status === 'Absent').length;
   const leaveDays = employeeRecords.filter(rec => rec.status === 'Leave').length;
+  const halfDayDays = employeeRecords.filter(rec => rec.status === 'Half Day').length;
+  const wfhDays = employeeRecords.filter(rec => rec.status === 'Work From Home').length;
+
+  // WFH counts as full working day, Half Day counts as 0.5
+  const presenceScore = presentDays + wfhDays + (halfDayDays * 0.5);
 
   const attendancePercentage = totalDays > 0 
-    ? Math.round((presentDays / totalDays) * 100) 
+    ? Math.round((presenceScore / totalDays) * 100) 
     : 0;
 
   // Evaluation status
@@ -76,7 +81,7 @@ const Summary = () => {
         <div>
           <h3 className="card-title" style={{ marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <BarChart3 size={20} style={{ color: 'var(--primary)' }} />
-            Employee Attendance Summary
+            Employee Attendance Summary Reports
           </h3>
           <p style={{ fontSize: '0.875rem', margin: 0 }}>
             Analyze the historical attendance percentage and metrics of individual team members.
@@ -128,7 +133,7 @@ const Summary = () => {
               >
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
-                    {emp.name}
+                    {emp.name} ({emp.employeeId || 'N/A'})
                   </option>
                 ))}
               </select>
@@ -179,26 +184,32 @@ const Summary = () => {
           </div>
 
           {/* Right panel: Counts Grid and Log Breakdown */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flexGrow: 1 }}>
             {/* Box Stats Grid */}
-            <div className="summary-stats-grid">
-              <div className="summary-stat-box">
-                <div className="summary-stat-box-val total">{totalDays}</div>
-                <div className="summary-stat-box-lbl">Total Days Tracked</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+              <div className="summary-stat-box" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', textAlign: 'center' }}>
+                <div className="summary-stat-box-val total" style={{ color: 'var(--primary)', fontSize: '1.5rem', fontWeight: 800 }}>{totalDays}</div>
+                <div className="summary-stat-box-lbl" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Days Tracked</div>
               </div>
-              <div className="summary-stats-grid" style={{ gridColumn: 'span 3', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginTop: 0 }}>
-                <div className="summary-stat-box">
-                  <div className="summary-stat-box-val present">{presentDays}</div>
-                  <div className="summary-stat-box-lbl">Present</div>
-                </div>
-                <div className="summary-stat-box">
-                  <div className="summary-stat-box-val absent">{absentDays}</div>
-                  <div className="summary-stat-box-lbl">Absent</div>
-                </div>
-                <div className="summary-stat-box">
-                  <div className="summary-stat-box-val leave">{leaveDays}</div>
-                  <div className="summary-stat-box-lbl">Leave</div>
-                </div>
+              <div className="summary-stat-box" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', textAlign: 'center' }}>
+                <div className="summary-stat-box-val present" style={{ color: 'var(--success)', fontSize: '1.5rem', fontWeight: 800 }}>{presentDays}</div>
+                <div className="summary-stat-box-lbl" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Present</div>
+              </div>
+              <div className="summary-stat-box" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', textAlign: 'center' }}>
+                <div className="summary-stat-box-val absent" style={{ color: 'var(--danger)', fontSize: '1.5rem', fontWeight: 800 }}>{absentDays}</div>
+                <div className="summary-stat-box-lbl" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Absent</div>
+              </div>
+              <div className="summary-stat-box" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', textAlign: 'center' }}>
+                <div className="summary-stat-box-val leave" style={{ color: 'var(--warning)', fontSize: '1.5rem', fontWeight: 800 }}>{leaveDays}</div>
+                <div className="summary-stat-box-lbl" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>On Leave</div>
+              </div>
+              <div className="summary-stat-box" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', textAlign: 'center' }}>
+                <div className="summary-stat-box-val half-day" style={{ color: '#3b82f6', fontSize: '1.5rem', fontWeight: 800 }}>{halfDayDays}</div>
+                <div className="summary-stat-box-lbl" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Half Day</div>
+              </div>
+              <div className="summary-stat-box" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', textAlign: 'center' }}>
+                <div className="summary-stat-box-val wfh" style={{ color: '#8b5cf6', fontSize: '1.5rem', fontWeight: 800 }}>{wfhDays}</div>
+                <div className="summary-stat-box-lbl" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>WFH</div>
               </div>
             </div>
 
@@ -233,10 +244,17 @@ const Summary = () => {
                       borderBottom: '1px solid var(--bg-secondary)',
                       fontSize: '0.9rem'
                     }}>
-                      <span style={{ fontStyle: 'normal' }}>
-                        {new Date(rec.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                      </span>
-                      <span className={`badge ${rec.status.toLowerCase()}`} style={{ fontSize: '0.7rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <span style={{ fontWeight: 500 }}>
+                          {new Date(rec.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </span>
+                        {rec.time && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            Marked at: {rec.time}
+                          </span>
+                        )}
+                      </div>
+                      <span className={`badge ${rec.status.toLowerCase().replace(/\s+/g, '-')}`} style={{ fontSize: '0.7rem' }}>
                         {rec.status}
                       </span>
                     </div>
@@ -247,6 +265,17 @@ const Summary = () => {
           </div>
         </div>
       )}
+
+      <style>{`
+        .badge.half-day {
+          background-color: rgba(59, 130, 246, 0.1);
+          color: #3b82f6;
+        }
+        .badge.work-from-home {
+          background-color: rgba(139, 92, 246, 0.1);
+          color: #8b5cf6;
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { useState, useContext } from 'react';
 import { AttendanceContext } from '../context/AttendanceContext';
-import { CalendarCheck, Mail, Lock, User, ShieldCheck } from 'lucide-react';
+import { CalendarCheck, Mail, Lock, User } from 'lucide-react';
 
 const Login = () => {
   const { login, register, loading } = useContext(AttendanceContext);
@@ -9,7 +9,6 @@ const Login = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('Employee'); // Default role
   const [errorMsg, setErrorMsg] = useState('');
 
   const toggleMode = () => {
@@ -17,7 +16,6 @@ const Login = () => {
     setName('');
     setEmail('');
     setPassword('');
-    setRole('Employee');
     setErrorMsg('');
   };
 
@@ -44,11 +42,16 @@ const Login = () => {
     if (isLogin) {
       success = await login(email.trim(), password);
     } else {
-      success = await register(name.trim(), email.trim(), password, role);
+      // Force 'Admin' (Manager) role during account creation
+      success = await register(name.trim(), email.trim(), password, 'Admin');
     }
 
     if (!success) {
-      setErrorMsg('Operation failed. Please verify credentials.');
+      setErrorMsg(
+        isLogin 
+          ? 'Invalid manager credentials or unauthorized access.' 
+          : 'Registration failed. Email might already be in use.'
+      );
     }
   };
 
@@ -63,7 +66,7 @@ const Login = () => {
     }}>
       <div className="card" style={{
         width: '100%',
-        maxWidth: '450px',
+        maxWidth: '420px',
         padding: '2.5rem',
         boxShadow: 'var(--shadow-xl)',
         borderRadius: 'var(--radius-lg)',
@@ -99,10 +102,9 @@ const Login = () => {
             fontSize: '0.85rem',
             color: 'var(--text-muted)',
             textAlign: 'center',
+            marginTop: '0.25rem'
           }}>
-            {isLogin 
-              ? 'Sign in to access your attendance workspace' 
-              : 'Create a new account to join the roster'}
+            {isLogin ? 'Manager Login Workspace' : 'Create Manager Account'}
           </p>
         </div>
 
@@ -161,7 +163,7 @@ const Login = () => {
               <input
                 type="email"
                 id="email-input"
-                placeholder="e.g. rahul@example.com"
+                placeholder="e.g. manager@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="form-input"
@@ -195,32 +197,6 @@ const Login = () => {
             </div>
           </div>
 
-          {/* Role Field (Register Mode Only) */}
-          {!isLogin && (
-            <div className="form-group">
-              <label htmlFor="role-select" className="form-label">Role</label>
-              <div style={{ position: 'relative' }}>
-                <ShieldCheck size={16} style={{
-                  position: 'absolute',
-                  left: '1rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--text-muted)'
-                }} />
-                <select
-                  id="role-select"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="form-select"
-                  style={{ paddingLeft: '2.5rem' }}
-                >
-                  <option value="Employee">Employee (View own attendance only)</option>
-                  <option value="Admin">Admin (Full system management)</option>
-                </select>
-              </div>
-            </div>
-          )}
-
           {/* Submit Button */}
           <button
             type="submit"
@@ -246,7 +222,7 @@ const Login = () => {
                 animation: 'spin 1s linear infinite'
               }}></span>
             ) : null}
-            <span>{isLogin ? 'Sign In' : 'Sign Up'}</span>
+            <span>{isLogin ? 'Sign In' : 'Register Manager'}</span>
           </button>
         </form>
 
@@ -257,7 +233,7 @@ const Login = () => {
           fontSize: '0.875rem',
         }}>
           <span style={{ color: 'var(--text-muted)' }}>
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            {isLogin ? "Don't have a manager account? " : "Already have an account? "}
           </span>
           <button
             onClick={toggleMode}
@@ -275,7 +251,6 @@ const Login = () => {
           </button>
         </div>
 
-        {/* Add standard animation style for spinner if needed */}
         <style>{`
           @keyframes spin {
             0% { transform: rotate(0deg); }

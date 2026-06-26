@@ -14,7 +14,7 @@ const generateToken = (id) => {
 // @access  Public
 const registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
       res.status(400);
@@ -28,36 +28,21 @@ const registerUser = async (req, res, next) => {
       throw new Error('User already exists with this email');
     }
 
-    // Create user
+    // Create user (Force role to 'Admin' since employees can't have accounts)
     const user = await User.create({
       name,
       email,
       password,
-      role: role || 'Employee',
+      role: 'Admin',
     });
 
     if (user) {
-      let employeeId = null;
-      if (user.role === 'Employee') {
-        let emp = await Employee.findOne({ email: user.email });
-        if (!emp) {
-          emp = await Employee.create({
-            name: user.name,
-            email: user.email,
-            department: 'General',
-            designation: 'Associate',
-          });
-        }
-        employeeId = emp._id.toString();
-      }
-
       return res.status(201).json({
         success: true,
         _id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
-        employeeId: employeeId,
         token: generateToken(user._id),
       });
     } else {
@@ -85,13 +70,10 @@ const loginUser = async (req, res, next) => {
     const user = await User.findOne({ email });
 
     if (user && (await user.matchPassword(password))) {
-      // Find associated employeeId if the role is Employee
-      let employeeId = null;
-      if (user.role === 'Employee') {
-        const emp = await Employee.findOne({ email: user.email });
-        if (emp) {
-          employeeId = emp._id.toString();
-        }
+      // Ensure only Admin (Manager) can log in
+      if (user.role !== 'Admin') {
+        res.status(403);
+        throw new Error('Access denied: Only managers can log into the system');
       }
 
       return res.json({
@@ -100,7 +82,6 @@ const loginUser = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        employeeId: employeeId,
         token: generateToken(user._id),
       });
     } else {

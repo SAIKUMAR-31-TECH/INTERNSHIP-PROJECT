@@ -7,6 +7,7 @@ import AttendanceForm from './components/AttendanceForm';
 import AttendanceTable from './components/AttendanceTable';
 import Summary from './components/Summary';
 import EmployeeManager from './components/EmployeeManager';
+import Settings from './components/Settings';
 import Login from './components/Login';
 import { CheckCircle2, AlertOctagon, AlertCircle } from 'lucide-react';
 
@@ -14,27 +15,21 @@ const AppContent = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const { user, notification } = useContext(AttendanceContext);
 
-  // If role is Employee, enforce dashboard tab
-  if (user && user.role === 'Employee' && activeTab !== 'dashboard') {
-    setActiveTab('dashboard');
-  }
-
   // Helper to render the active tab content
   const renderContent = () => {
-    // Role-based route protection on frontend
-    const isAdmin = user && user.role === 'Admin';
-
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard setActiveTab={setActiveTab} />;
       case 'mark':
-        return isAdmin ? <AttendanceForm /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <AttendanceForm />;
       case 'history':
-        return isAdmin ? <AttendanceTable /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <AttendanceTable />;
       case 'summary':
-        return isAdmin ? <Summary /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <Summary />;
       case 'roster':
-        return isAdmin ? <EmployeeManager /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <EmployeeManager />;
+      case 'settings':
+        return <Settings />;
       default:
         return <Dashboard setActiveTab={setActiveTab} />;
     }

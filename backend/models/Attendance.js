@@ -7,14 +7,27 @@ const attendanceSchema = new mongoose.Schema(
       ref: 'Employee',
       required: [true, 'Please reference an employee'],
     },
+    employeeName: {
+      type: String,
+      required: [true, 'Please add an employee name'],
+    },
     date: {
       type: String,
       required: [true, 'Please add a date string (YYYY-MM-DD)'],
     },
+    time: {
+      type: String,
+      required: [true, 'Please add a time string'],
+    },
     status: {
       type: String,
-      enum: ['Present', 'Absent', 'Leave'],
+      enum: ['Present', 'Absent', 'Leave', 'Half Day', 'Work From Home'],
       required: [true, 'Please set attendance status'],
+    },
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: false,
     },
   },
   {

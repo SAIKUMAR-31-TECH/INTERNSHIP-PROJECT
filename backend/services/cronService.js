@@ -39,7 +39,7 @@ const runAttendanceCheck = async () => {
     console.log(`[Cron Job] Starting daily attendance reminder check for date: ${todayStr}`);
 
     // 1. Fetch all active employees
-    const employees = await Employee.find({});
+    const employees = await Employee.find({ status: 'Active' });
     
     // 2. Fetch all attendance marked for today
     const todayAttendance = await Attendance.find({ date: todayStr });
