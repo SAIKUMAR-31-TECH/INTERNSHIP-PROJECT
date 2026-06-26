@@ -7,7 +7,7 @@
     "backend": {
       "root": "backend",
       "routePrefix": "/_backend",
-      "entrypoint": "index.js"
+      "entrypoint": "app.js"
     }
   }
 }
